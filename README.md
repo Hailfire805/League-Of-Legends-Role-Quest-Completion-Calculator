@@ -111,9 +111,9 @@ Based on official Season 2025 role quest data:
 
 ### Option 1: Use The Executable For The Desired Lane
 1. Use the links below to download the pre-packaged Executables for your lane (File Downloads via GitHub Releases, 38 MB each):
-   - Top Lane: [`LoL_Quest_Calculator_Top.exe`](https://github.com/Hailfire805/League-Of-Legends-Role-Quest-Completion-Calculator/releases/download/V1.0.0/LoL_Quest_Calculator_Top.exe)
-   - Mid Lane: [`LoL_Quest_Calculator_Mid.exe`](https://github.com/Hailfire805/League-Of-Legends-Role-Quest-Completion-Calculator/releases/download/V1.0.0/LoL_Quest_Calculator_Mid.exe)
-   - Bot Lane: [`LoL_Quest_Calculator_Bot.exe`](https://github.com/Hailfire805/League-Of-Legends-Role-Quest-Completion-Calculator/releases/download/V1.0.0/LoL_Quest_Calculator_Bot.exe)
+   - Top Lane: [`LoL_Quest_Calculator_Top.exe`](https://github.com/Hailfire805/League-Of-Legends-Role-Quest-Completion-Calculator/releases/download/V1.0.1/LoL_Quest_Calculator_Top.exe)
+   - Mid Lane: [`LoL_Quest_Calculator_Mid.exe`](https://github.com/Hailfire805/League-Of-Legends-Role-Quest-Completion-Calculator/releases/download/V1.0.1/LoL_Quest_Calculator_Mid.exe)
+   - Bot Lane: [`LoL_Quest_Calculator_Bot.exe`](https://github.com/Hailfire805/League-Of-Legends-Role-Quest-Completion-Calculator/releases/download/V1.0.1/LoL_Quest_Calculator_Bot.exe)
 2. Run the downloaded `.exe` file directly (no installation needed)
 3. Input your typical game stats in the GUI and hit "Calculate" or "Add to Comparison" to view multiple scenarios
 
