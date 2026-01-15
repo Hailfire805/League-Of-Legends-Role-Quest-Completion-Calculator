@@ -1,7 +1,9 @@
 """
-League of Legends Role Quest Completion Time Calculator
+League of Legends MID LANE Role Quest Completion Time Calculator
 
-This tool calculates the expected quest completion time based on player performance metrics.
+This tool calculates the expected quest completion time based on player performance metrics
+for MID LANE role quests.
+
 All conversion formulas are defined as constants at the top for easy adjustment.
 
 Author: Created for LoL Role Quest Research
@@ -16,169 +18,233 @@ import numpy as np
 
 
 # ============================================================================
-# CONVERSION FORMULAS - Update these values as your research progresses
+# CONVERSION FORMULAS - MID LANE SPECIFIC
 # ============================================================================
 
-# Passive generation rate (points per minute when not in lane)
-PASSIVE_POINTS_PER_MINUTE = 100
+# Passive generation rate in mid lane (after 1:05)
+# 8 points every 5 seconds = 96 points per minute
+PASSIVE_POINTS_PER_MINUTE = 96
 
-# Base quest completion time with passive generation only (minutes)
-BASE_COMPLETION_TIME = 14
+# Base quest completion requirement
+TOTAL_QUEST_POINTS = 1350
 
-# Total points needed to complete quest (derived from passive rate * base time)
-TOTAL_QUEST_POINTS = PASSIVE_POINTS_PER_MINUTE * BASE_COMPLETION_TIME
+# Quest generation start time
+PASSIVE_START_TIME = 1 + 5/60  # 1:05 in minutes
 
-# Time reduction per game event (in seconds)
-TIME_REDUCTION_PER_WAVE = 8  # Full minion wave (6 minions)
-TIME_REDUCTION_PER_40_CS = 48  # 40 CS worth of minions
-TIME_REDUCTION_PER_KILL = 15  # Champion takedown
-TIME_REDUCTION_PER_EPIC = 18  # Epic monster (dragon, baron, etc.)
-TIME_REDUCTION_PER_PLATE = 24  # Turret plate
-TIME_REDUCTION_PER_TURRET = 30  # Full turret destruction
+# Base completion time with passive generation only
+# = 1:05 startup + (1350 points / 96 points per min) = 1:05 + 14.06 min ≈ 15.1 min
+BASE_COMPLETION_TIME = PASSIVE_START_TIME + \
+    (TOTAL_QUEST_POINTS / PASSIVE_POINTS_PER_MINUTE)
 
-# Mid lane damage conversion (per 1000 damage dealt to champions)
-TIME_REDUCTION_PER_1K_DAMAGE_MELEE = 19  # Melee mid laner
-TIME_REDUCTION_PER_1K_DAMAGE_RANGED = 9  # Ranged mid laner
+# Point values for MID LANE from official data
+POINTS_PER_KILL = 25  # Champion takedowns (HIGHER than other lanes)
+POINTS_PER_MINION_MID = 2  # Minion kills in mid lane
+POINTS_PER_MINION_OTHER = 1  # Minion kills in other lanes
+POINTS_PER_TURRET_MID = 50  # Turret takedowns in mid lane
+POINTS_PER_TURRET_OTHER = 25  # Turret takedowns in other lanes
+POINTS_PER_PLATE_MID = 40  # Turret plates in mid lane
+POINTS_PER_PLATE_OTHER = 20  # Turret plates in other lanes
+POINTS_PER_EPIC = 30  # Epic monster takedowns
 
-# Derived conversions
-CS_TO_TIME_REDUCTION = TIME_REDUCTION_PER_40_CS / 40  # Seconds per CS (~1.2 seconds)
+# Champion damage conversion (Mid lane specific)
+DAMAGE_TO_POINTS_MELEE = 0.03  # 3% of damage dealt (melee)
+DAMAGE_TO_POINTS_RANGED = 0.015  # 1.5% of damage dealt (ranged)
 
 
 # ============================================================================
 # CALCULATION FUNCTIONS
 # ============================================================================
 
-def calculate_time_reduction(cs_per_min, damage_per_min, plates, turret_destroyed, 
-                            kills, epic_monsters, is_melee, game_duration=14):
+def calculate_points_from_cs(cs_in_mid, cs_in_other):
     """
-    Calculate total time reduction from all sources.
-    
+    Calculate points from CS.
+
     Args:
-        cs_per_min: Creep score per minute (float)
-        damage_per_min: Champion damage per minute (float)
-        plates: Number of turret plates secured (0-5)
-        turret_destroyed: Boolean indicating if turret was destroyed
-        kills: Number of champion takedowns (int)
-        epic_monsters: Number of epic monster takedowns (int)
-        is_melee: Boolean indicating if champion is melee
-        game_duration: Expected game duration in minutes for CS calculation
-        
+        cs_in_mid: CS earned in mid lane
+        cs_in_other: CS earned in other lanes
+
     Returns:
-        Dictionary containing breakdown of time reductions and total
+        Total points from CS
     """
-    
-    # Calculate time reduction from CS
-    total_cs = cs_per_min * game_duration
-    cs_reduction = total_cs * CS_TO_TIME_REDUCTION
-    
-    # Calculate time reduction from champion damage (mid lane mechanic)
-    # Damage is per minute, so total damage = damage_per_min * game_duration
-    total_damage = damage_per_min * game_duration
-    damage_thousands = total_damage / 1000
-    
-    if is_melee:
-        damage_reduction = damage_thousands * TIME_REDUCTION_PER_1K_DAMAGE_MELEE
-    else:
-        damage_reduction = damage_thousands * TIME_REDUCTION_PER_1K_DAMAGE_RANGED
-    
-    # Calculate time reduction from objectives
-    plates_reduction = plates * TIME_REDUCTION_PER_PLATE
-    turret_reduction = TIME_REDUCTION_PER_TURRET if turret_destroyed else 0
-    
-    # Calculate time reduction from kills
-    kills_reduction = kills * TIME_REDUCTION_PER_KILL
-    epic_reduction = epic_monsters * TIME_REDUCTION_PER_EPIC
-    
-    # Total time reduction
-    total_reduction = (cs_reduction + damage_reduction + plates_reduction + 
-                      turret_reduction + kills_reduction + epic_reduction)
-    
+    return (cs_in_mid * POINTS_PER_MINION_MID +
+            cs_in_other * POINTS_PER_MINION_OTHER)
+
+
+def calculate_points_from_objectives(plates_mid, plates_other, turrets_mid,
+                                     turrets_other, kills, epic_monsters):
+    """
+    Calculate points from objectives and kills.
+
+    Args:
+        plates_mid: Turret plates in mid lane (0-5)
+        plates_other: Turret plates in other lanes
+        turrets_mid: Turrets destroyed in mid lane
+        turrets_other: Turrets destroyed in other lanes
+        kills: Champion takedowns
+        epic_monsters: Epic monster takedowns
+
+    Returns:
+        Dictionary with breakdown of points
+    """
+    plates_points = (plates_mid * POINTS_PER_PLATE_MID +
+                     plates_other * POINTS_PER_PLATE_OTHER)
+    turret_points = (turrets_mid * POINTS_PER_TURRET_MID +
+                     turrets_other * POINTS_PER_TURRET_OTHER)
+    kill_points = kills * POINTS_PER_KILL
+    epic_points = epic_monsters * POINTS_PER_EPIC
+
     return {
-        'cs': cs_reduction,
-        'damage': damage_reduction,
-        'plates': plates_reduction,
-        'turret': turret_reduction,
-        'kills': kills_reduction,
-        'epic_monsters': epic_reduction,
-        'total': total_reduction
+        'plates': plates_points,
+        'turrets': turret_points,
+        'kills': kill_points,
+        'epic': epic_points,
+        'total': plates_points + turret_points + kill_points + epic_points
     }
 
 
-def calculate_completion_time(time_reduction_seconds):
+def calculate_points_from_damage(damage_dealt, is_melee):
     """
-    Calculate quest completion time given total time reduction.
+    Calculate points from champion damage (Mid lane specific).
     
     Args:
-        time_reduction_seconds: Total time reduction in seconds
+        damage_dealt: Total damage dealt to champions
+        is_melee: Boolean indicating if champion is melee
         
     Returns:
-        Completion time in minutes (float)
+        Points from damage
     """
-    base_time_seconds = BASE_COMPLETION_TIME * 60
-    completion_time_seconds = base_time_seconds - time_reduction_seconds
-    
-    # Ensure we don't go below 0
-    completion_time_seconds = max(0, completion_time_seconds)
-    
-    return completion_time_seconds / 60
+    rate = DAMAGE_TO_POINTS_MELEE if is_melee else DAMAGE_TO_POINTS_RANGED
+    return damage_dealt * rate
 
 
-def generate_accumulation_curve(cs_per_min, damage_per_min, plates, turret_destroyed,
-                                kills, epic_monsters, is_melee, completion_time):
+def calculate_passive_points(time_minutes):
+    """
+    Calculate passive points accumulated over time in mid lane.
+
+    Args:
+        time_minutes: Game time in minutes
+
+    Returns:
+        Total passive points at this time
+    """
+    if time_minutes <= PASSIVE_START_TIME:
+        # No points before 1:05
+        return 0
+
+    # After 1:05: 96 points per minute
+    time_after_start = time_minutes - PASSIVE_START_TIME
+    points = PASSIVE_POINTS_PER_MINUTE * time_after_start
+
+    return points
+
+
+def calculate_completion_time(cs_per_min_mid, cs_per_min_other, damage_per_min,
+                              is_melee, plates_mid, plates_other,
+                              turrets_mid, turrets_other, kills, epic_monsters):
+    """
+    Calculate quest completion time given performance metrics.
+    
+    Properly handles CS and damage as rates (per minute) instead of totals.
+
+    Returns:
+        Tuple of (completion_time, points_breakdown)
+    """
+    # Calculate points from objectives
+    obj_breakdown = calculate_points_from_objectives(
+        plates_mid, plates_other, turrets_mid, turrets_other, kills, epic_monsters
+    )
+    objective_points = obj_breakdown['total']
+
+    # Use binary search to find completion time where:
+    # passive_points(t) + cs_points(t) + damage_points(t) + objective_points = TOTAL_QUEST_POINTS
+    low, high = PASSIVE_START_TIME, 30.0
+    tolerance = 0.001
+
+    while high - low > tolerance:
+        mid = (low + high) / 2
+
+        passive = calculate_passive_points(mid)
+        cs_points = (cs_per_min_mid * mid * POINTS_PER_MINION_MID +
+                     cs_per_min_other * mid * POINTS_PER_MINION_OTHER)
+        damage_points = calculate_points_from_damage(
+            damage_per_min * mid, is_melee)
+        total_points = passive + cs_points + damage_points + objective_points
+
+        if total_points < TOTAL_QUEST_POINTS:
+            low = mid
+        else:
+            high = mid
+
+    completion_time = (low + high) / 2
+
+    # Calculate actual values at completion time
+    final_cs_mid = cs_per_min_mid * completion_time
+    final_cs_other = cs_per_min_other * completion_time
+    final_damage = damage_per_min * completion_time
+    
+    cs_points = calculate_points_from_cs(final_cs_mid, final_cs_other)
+    damage_points = calculate_points_from_damage(final_damage, is_melee)
+    active_points = cs_points + damage_points + obj_breakdown['total']
+
+    # Build detailed breakdown
+    breakdown = {
+        'cs_mid': final_cs_mid * POINTS_PER_MINION_MID,
+        'cs_other': final_cs_other * POINTS_PER_MINION_OTHER,
+        'cs_total': cs_points,
+        'damage': damage_points,
+        'plates': obj_breakdown['plates'],
+        'turrets': obj_breakdown['turrets'],
+        'kills': obj_breakdown['kills'],
+        'epic': obj_breakdown['epic'],
+        'active_total': active_points,
+        'passive_total': calculate_passive_points(completion_time)
+    }
+
+    return completion_time, breakdown
+
+
+def generate_accumulation_curve(cs_per_min_mid, cs_per_min_other, damage_per_min,
+                                is_melee, plates_mid, plates_other, turrets_mid,
+                                turrets_other, kills, epic_monsters, completion_time):
     """
     Generate point accumulation curve over time.
-    
-    This models how quest points accumulate during a game, accounting for:
-    - Passive generation (constant rate)
-    - CS generation (increases linearly with CS/min rate)
-    - Damage dealt (increases linearly with damage/min rate)
-    - Objective events (discrete jumps at assumed times)
-    
-    Args:
-        Same as calculate_time_reduction, plus completion_time
-        
+
     Returns:
         Tuple of (time_array, points_array) for plotting
     """
-    
-    # Create time array from 0 to completion time (or 14 min baseline)
-    max_time = max(completion_time, BASE_COMPLETION_TIME)
+    max_time = max(completion_time, BASE_COMPLETION_TIME) + 1
     time_points = np.linspace(0, max_time, 1000)
     quest_points = np.zeros_like(time_points)
-    
+
+    # Calculate totals at completion
+    total_cs_mid = cs_per_min_mid * completion_time
+    total_cs_other = cs_per_min_other * completion_time
+    total_damage = damage_per_min * completion_time
+
     for i, t in enumerate(time_points):
         # Passive generation
-        points = PASSIVE_POINTS_PER_MINUTE * t
-        
-        # CS contribution (scales with time)
-        cs_at_time = cs_per_min * t
-        cs_points = cs_at_time * CS_TO_TIME_REDUCTION * PASSIVE_POINTS_PER_MINUTE / 60
-        points += cs_points
-        
-        # Damage contribution (scales with time)
-        damage_at_time = damage_per_min * t
-        damage_thousands = damage_at_time / 1000
-        if is_melee:
-            damage_points = damage_thousands * TIME_REDUCTION_PER_1K_DAMAGE_MELEE * PASSIVE_POINTS_PER_MINUTE / 60
-        else:
-            damage_points = damage_thousands * TIME_REDUCTION_PER_1K_DAMAGE_RANGED * PASSIVE_POINTS_PER_MINUTE / 60
-        points += damage_points
-        
-        # Objective contributions (simplified: assume evenly distributed)
-        # In reality, these would be discrete jumps at specific times
-        # For visualization purposes, we distribute them linearly
-        if t > 0:
-            objectives_progress = min(t / completion_time, 1.0) if completion_time > 0 else 0
+        points = calculate_passive_points(t)
+
+        # CS and damage contribution (scales linearly with time)
+        if completion_time > 0:
+            progress = min(t / completion_time, 1.0)
+            cs_mid_at_time = total_cs_mid * progress
+            cs_other_at_time = total_cs_other * progress
+            damage_at_time = total_damage * progress
             
-            plates_points = plates * TIME_REDUCTION_PER_PLATE * PASSIVE_POINTS_PER_MINUTE / 60 * objectives_progress
-            turret_points = (TIME_REDUCTION_PER_TURRET if turret_destroyed else 0) * PASSIVE_POINTS_PER_MINUTE / 60 * objectives_progress
-            kills_points = kills * TIME_REDUCTION_PER_KILL * PASSIVE_POINTS_PER_MINUTE / 60 * objectives_progress
-            epic_points = epic_monsters * TIME_REDUCTION_PER_EPIC * PASSIVE_POINTS_PER_MINUTE / 60 * objectives_progress
-            
-            points += plates_points + turret_points + kills_points + epic_points
-        
+            points += calculate_points_from_cs(cs_mid_at_time, cs_other_at_time)
+            points += calculate_points_from_damage(damage_at_time, is_melee)
+
+            # Objectives (distributed linearly for visualization)
+            obj_points = calculate_points_from_objectives(
+                plates_mid * progress, plates_other * progress,
+                turrets_mid * progress, turrets_other * progress,
+                kills * progress, epic_monsters * progress
+            )
+            points += obj_points['total']
+
         quest_points[i] = points
-    
+
     return time_points, quest_points
 
 
@@ -186,370 +252,471 @@ def generate_accumulation_curve(cs_per_min, damage_per_min, plates, turret_destr
 # GUI APPLICATION
 # ============================================================================
 
-class QuestCalculatorGUI:
+class MidLaneQuestCalculatorGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("LoL Role Quest Completion Calculator")
-        self.root.geometry("1200x700")
-        
-        # Stored scenarios for comparison
+        self.root.title("LoL MID LANE Quest Completion Calculator")
+        self.root.geometry("1200x750")
+
         self.comparison_scenarios = []
-        
         self.setup_ui()
-        
+
     def setup_ui(self):
         """Initialize the user interface."""
-        
-        # Main container with two columns: inputs on left, graph on right
+
         main_frame = ttk.Frame(self.root, padding="10")
-        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-        
-        # Configure grid weights for responsiveness
+        main_frame.grid(row=0, column=0, sticky=(
+            tk.W, tk.E, tk.N, tk.S))  # type: ignore
+
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
         main_frame.columnconfigure(1, weight=1)
         main_frame.rowconfigure(0, weight=1)
-        
+
         # Left panel: Input controls
-        input_frame = ttk.LabelFrame(main_frame, text="Performance Metrics", padding="10")
-        input_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(0, 10))
-        
+        input_frame = ttk.LabelFrame(
+            main_frame, text="MID LANE Performance Metrics", padding="10")
+        input_frame.grid(row=0, column=0, sticky=(
+            tk.W, tk.E, tk.N, tk.S), padx=(0, 10))  # pyright: ignore[reportArgumentType]
+
         # Right panel: Graph and results
         output_frame = ttk.Frame(main_frame)
         output_frame.grid(row=0, column=1, sticky=(tk.W, tk.E, tk.N, tk.S))
         output_frame.rowconfigure(0, weight=1)
         output_frame.columnconfigure(0, weight=1)
-        
+
         # ---- Input Fields ----
         row = 0
-        
-        # CS per minute
-        ttk.Label(input_frame, text="CS per Minute:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        self.cs_per_min = tk.StringVar(value="7.0")
-        ttk.Entry(input_frame, textvariable=self.cs_per_min, width=15).grid(row=row, column=1, pady=5)
+
+        # Champion type section
+        ttk.Label(input_frame, text="=== Champion Type ===", font=('TkDefaultFont', 10, 'bold')).grid(
+            row=row, column=0, columnspan=2, pady=(0, 5))
         row += 1
-        
-        # Champion damage per minute
-        ttk.Label(input_frame, text="Champion Damage per Minute:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        self.damage_per_min = tk.StringVar(value="0")
-        ttk.Entry(input_frame, textvariable=self.damage_per_min, width=15).grid(row=row, column=1, pady=5)
+
+        self.is_melee = tk.BooleanVar(value=False)
+        ttk.Radiobutton(input_frame, text="Melee (3% damage)", variable=self.is_melee,
+                        value=True).grid(row=row, column=0, sticky=tk.W, pady=2)
+        ttk.Radiobutton(input_frame, text="Ranged (1.5% damage)", variable=self.is_melee,
+                        value=False).grid(row=row, column=1, sticky=tk.W, pady=2)
         row += 1
-        
-        # Melee/Ranged selector
-        ttk.Label(input_frame, text="Champion Type:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        self.champion_type = tk.StringVar(value="Melee")
-        type_frame = ttk.Frame(input_frame)
-        type_frame.grid(row=row, column=1, pady=5, sticky=tk.W)
-        ttk.Radiobutton(type_frame, text="Melee", variable=self.champion_type, value="Melee").pack(side=tk.LEFT)
-        ttk.Radiobutton(type_frame, text="Ranged", variable=self.champion_type, value="Ranged").pack(side=tk.LEFT)
+
+        # CS section
+        ttk.Label(input_frame, text="=== Creep Score ===", font=('TkDefaultFont', 10, 'bold')).grid(
+            row=row, column=0, columnspan=2, pady=(10, 5))
         row += 1
-        
-        # Turret plates
-        ttk.Label(input_frame, text="Turret Plates Secured (0-5):").grid(row=row, column=0, sticky=tk.W, pady=5)
-        self.plates = tk.StringVar(value="0")
-        plates_spinbox = ttk.Spinbox(input_frame, from_=0, to=5, textvariable=self.plates, width=13)
-        plates_spinbox.grid(row=row, column=1, pady=5)
+
+        ttk.Label(input_frame, text="CS/min in Mid Lane:").grid(row=row,
+                                                                column=0, sticky=tk.W, pady=5)
+        self.cs_per_min_mid = tk.StringVar(value="7.0")
+        ttk.Spinbox(input_frame, from_=0.0, to=12.0, textvariable=self.cs_per_min_mid,
+                    width=15, increment=0.1).grid(row=row, column=1, pady=5)
         row += 1
-        
-        # Turret destroyed
-        self.turret_destroyed = tk.BooleanVar(value=False)
-        ttk.Checkbutton(input_frame, text="Turret Destroyed", variable=self.turret_destroyed).grid(
-            row=row, column=0, columnspan=2, sticky=tk.W, pady=5
-        )
+
+        ttk.Label(input_frame, text="CS/min in Other Lanes:").grid(row=row,
+                                                                   column=0, sticky=tk.W, pady=5)
+        self.cs_per_min_other = tk.StringVar(value="0")
+        ttk.Spinbox(input_frame, from_=0, to=12, textvariable=self.cs_per_min_other,
+                    width=15, increment=0.1).grid(row=row, column=1, pady=5)
         row += 1
-        
-        # Champion takedowns
-        ttk.Label(input_frame, text="Champion Takedowns:").grid(row=row, column=0, sticky=tk.W, pady=5)
+
+        # Champion damage section
+        ttk.Label(input_frame, text="=== Champion Damage ===", font=('TkDefaultFont', 10, 'bold')).grid(
+            row=row, column=0, columnspan=2, pady=(10, 5))
+        row += 1
+
+        ttk.Label(input_frame, text="Damage/min to Champions:").grid(row=row,
+                                                                      column=0, sticky=tk.W, pady=5)
+        self.damage_per_min = tk.StringVar(value="500")
+        ttk.Spinbox(input_frame, from_=0, to=3000, textvariable=self.damage_per_min,
+                    width=15, increment=50).grid(row=row, column=1, pady=5)
+        row += 1
+
+        # Turret plates section
+        ttk.Label(input_frame, text="=== Turret Plates ===", font=('TkDefaultFont', 10, 'bold')).grid(
+            row=row, column=0, columnspan=2, pady=(10, 5))
+        row += 1
+
+        ttk.Label(input_frame, text="Plates in Mid Lane:").grid(row=row,
+                                                                column=0, sticky=tk.W, pady=5)
+        self.plates_mid = tk.StringVar(value="0")
+        ttk.Spinbox(input_frame, from_=0, to=10, textvariable=self.plates_mid,
+                    width=13).grid(row=row, column=1, pady=5)
+        row += 1
+
+        ttk.Label(input_frame, text="Plates in Other Lanes:").grid(
+            row=row, column=0, sticky=tk.W, pady=5)
+        self.plates_other = tk.StringVar(value="0")
+        ttk.Spinbox(input_frame, from_=0, to=10, textvariable=self.plates_other,
+                    width=13).grid(row=row, column=1, pady=5)
+        row += 1
+
+        # Turrets section
+        ttk.Label(input_frame, text="=== Turret Takedowns ===", font=('TkDefaultFont', 10, 'bold')).grid(
+            row=row, column=0, columnspan=2, pady=(10, 5))
+        row += 1
+
+        ttk.Label(input_frame, text="Turrets in Mid Lane:").grid(
+            row=row, column=0, sticky=tk.W, pady=5)
+        self.turrets_mid = tk.StringVar(value="0")
+        ttk.Spinbox(input_frame, from_=0, to=3, textvariable=self.turrets_mid,
+                    width=15).grid(row=row, column=1, pady=5)
+        row += 1
+
+        ttk.Label(input_frame, text="Turrets in Other Lanes:").grid(
+            row=row, column=0, sticky=tk.W, pady=5)
+        self.turrets_other = tk.StringVar(value="0")
+        ttk.Spinbox(input_frame, from_=0, to=3, textvariable=self.turrets_other,
+                    width=15).grid(row=row, column=1, pady=5)
+        row += 1
+
+        # Objectives section
+        ttk.Label(input_frame, text="=== Objectives & Kills ===", font=('TkDefaultFont', 10, 'bold')).grid(
+            row=row, column=0, columnspan=2, pady=(10, 5))
+        row += 1
+
+        ttk.Label(input_frame, text="Champion Takedowns:").grid(
+            row=row, column=0, sticky=tk.W, pady=5)
         self.kills = tk.StringVar(value="0")
-        ttk.Entry(input_frame, textvariable=self.kills, width=15).grid(row=row, column=1, pady=5)
+        ttk.Spinbox(input_frame, from_=0, to=15, textvariable=self.kills,
+                    width=15).grid(row=row, column=1, pady=5)
         row += 1
-        
-        # Epic monster takedowns
-        ttk.Label(input_frame, text="Epic Monster Takedowns:").grid(row=row, column=0, sticky=tk.W, pady=5)
+
+        ttk.Label(input_frame, text="Epic Monster Takedowns:").grid(
+            row=row, column=0, sticky=tk.W, pady=5)
         self.epic_monsters = tk.StringVar(value="0")
-        ttk.Entry(input_frame, textvariable=self.epic_monsters, width=15).grid(row=row, column=1, pady=5)
+        ttk.Spinbox(input_frame, from_=0, to=5, textvariable=self.epic_monsters,
+                    width=15).grid(row=row, column=1, pady=5)
         row += 1
-        
+
         # Separator
-        ttk.Separator(input_frame, orient='horizontal').grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=10)
+        ttk.Separator(input_frame, orient='horizontal').grid(
+            row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=10)
         row += 1
-        
+
         # Calculate button
         ttk.Button(input_frame, text="Calculate Quest Time", command=self.calculate).grid(
             row=row, column=0, columnspan=2, pady=10
         )
         row += 1
-        
-        # Add to comparison button
+
+        # Comparison buttons
         ttk.Button(input_frame, text="Add to Comparison", command=self.add_comparison).grid(
             row=row, column=0, columnspan=2, pady=5
         )
         row += 1
-        
-        # Clear comparison button
+
         ttk.Button(input_frame, text="Clear Comparisons", command=self.clear_comparisons).grid(
             row=row, column=0, columnspan=2, pady=5
         )
         row += 1
-        
+
         # Results text area
-        result_label_frame = ttk.LabelFrame(input_frame, text="Results", padding="10")
-        result_label_frame.grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=10)
+        result_label_frame = ttk.LabelFrame(
+            input_frame, text="Results", padding="10")
+        result_label_frame.grid(row=row, column=0, columnspan=2, sticky=(
+            tk.W, tk.E, tk.N, tk.S), pady=10)
         input_frame.rowconfigure(row, weight=1)
-        
-        self.results_text = tk.Text(result_label_frame, height=15, width=40, wrap=tk.WORD)
-        self.results_text.pack(fill=tk.BOTH, expand=True)
-        
+
+        self.results_text = tk.Text(
+            result_label_frame, height=12, width=40, wrap=tk.WORD)
+        scrollbar = ttk.Scrollbar(
+            result_label_frame, orient='vertical', command=self.results_text.yview)
+        self.results_text.configure(yscrollcommand=scrollbar.set)
+        self.results_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
         # ---- Graph Area ----
         self.figure = Figure(figsize=(8, 6), dpi=100)
         self.ax = self.figure.add_subplot(111)
-        
+
         self.canvas = FigureCanvasTkAgg(self.figure, master=output_frame)
         self.canvas.get_tk_widget().grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-        
+
         # Add matplotlib toolbar for zoom/pan
         from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk
         toolbar_frame = ttk.Frame(output_frame)
         toolbar_frame.grid(row=1, column=0, sticky=(tk.W, tk.E))
         toolbar = NavigationToolbar2Tk(self.canvas, toolbar_frame)
         toolbar.update()
-        
-        # Initial graph setup
+
         self.plot_baseline()
-        
+
     def plot_baseline(self):
         """Plot the baseline passive-only accumulation curve."""
         self.ax.clear()
-        
-        time_points = np.linspace(0, BASE_COMPLETION_TIME, 100)
-        quest_points = PASSIVE_POINTS_PER_MINUTE * time_points
-        # Calculate percentage completion
+
+        time_points = np.linspace(0, BASE_COMPLETION_TIME, 200)
+        quest_points = np.array([calculate_passive_points(t)
+                                for t in time_points])
         percentage_complete = (quest_points / TOTAL_QUEST_POINTS) * 100
         percentage_complete = np.minimum(100, percentage_complete)
-        
-        self.ax.plot(time_points, percentage_complete, '--', color='gray', label='Passive Only (Baseline)', linewidth=2)
-        self.ax.axhline(y=100, color='red', linestyle=':', label='Quest Completion', linewidth=2)
-        
+
+        self.ax.plot(time_points, percentage_complete, '--', color='gray',
+                     label=f'{int(BASE_COMPLETION_TIME * 60 // 60)}m{int(BASE_COMPLETION_TIME * 60 % 60)}s Passive Only (Mid Lane)', linewidth=2)
+        self.ax.axhline(y=100, color='red', linestyle=':',
+                        label='Quest Completion (1350 pts)', linewidth=2)
+
         self.ax.set_xlabel('Game Time (minutes)', fontsize=12)
         self.ax.set_ylabel('Quest Completion (%)', fontsize=12)
-        self.ax.set_title('Role Quest - Completion Progress', fontsize=14, fontweight='bold')
+        self.ax.set_title('MID LANE Quest - Completion Progress',
+                          fontsize=14, fontweight='bold')
         self.ax.legend()
         self.ax.grid(True, alpha=0.3)
-        
+
         self.canvas.draw()
-        
+
     def get_inputs(self):
         """Retrieve and validate all input values."""
+        cs_mid = 0
+        cs_other = 0
+        damage = 0
+        plates_mid = 0
+        plates_other = 0
+        turrets_mid = 0
+        turrets_other = 0
+        kills = 0
+        epic = 0
+
         try:
-            cs = float(self.cs_per_min.get())
+            cs_mid = float(self.cs_per_min_mid.get())
+            cs_other = float(self.cs_per_min_other.get())
             damage = float(self.damage_per_min.get())
-            plates = int(self.plates.get())
-            turret = self.turret_destroyed.get()
+            plates_mid = int(self.plates_mid.get())
+            plates_other = int(self.plates_other.get())
+            turrets_mid = int(self.turrets_mid.get())
+            turrets_other = int(self.turrets_other.get())
             kills = int(self.kills.get())
             epic = int(self.epic_monsters.get())
-            is_melee = self.champion_type.get() == "Melee"
-            
-            # Validate ranges
-            if cs < 0:
-                raise ValueError("CS per minute cannot be negative")
-            if damage < 0:
-                raise ValueError("Damage per minute cannot be negative")
-            if not 0 <= plates <= 5:
-                raise ValueError("Turret plates must be between 0 and 5")
-            if kills < 0:
-                raise ValueError("Champion takedowns cannot be negative")
-            if epic < 0:
-                raise ValueError("Epic monster takedowns cannot be negative")
-            
-            return cs, damage, plates, turret, kills, epic, is_melee
-            
+
         except ValueError as e:
-            messagebox.showerror("Input Error", f"Invalid input: {str(e)}")
-            return None
-    
+            print(f"Invalid input detected : {e}")
+
+        # Validate all inputs
+        if not 0 <= cs_mid:
+            cs_mid = max(0, cs_mid)
+        if not 0 <= cs_other:
+            cs_other = max(0, cs_other)
+        if not 0 <= damage:
+            damage = max(0, damage)
+        if not 0 <= plates_mid <= 10:
+            plates_mid = max(0, plates_mid)
+        if not 0 <= plates_other:
+            plates_other = max(0, plates_other)
+        if not 0 <= turrets_mid <= 10 or not 0 <= turrets_other <= 10:
+            turrets_mid = max(0, turrets_mid)
+            turrets_other = max(0, turrets_other)
+        if not 0 <= kills:
+            kills = max(0, kills)
+        if not 0 <= epic <= 10:
+            epic = max(0, epic)
+
+        is_melee = self.is_melee.get()
+
+        return cs_mid, cs_other, damage, is_melee, plates_mid, plates_other, turrets_mid, turrets_other, kills, epic
+
     def calculate(self):
         """Calculate and display quest completion time."""
         inputs = self.get_inputs()
         if inputs is None:
             return
-        
-        cs, damage, plates, turret, kills, epic, is_melee = inputs
-        
-        # Calculate time reductions
-        reductions = calculate_time_reduction(cs, damage, plates, turret, kills, epic, is_melee)
-        
-        # Calculate completion time
-        completion_time = calculate_completion_time(reductions['total'])
-        
-        # Update results text
-        self.display_results(completion_time, reductions)
-        
-        # Update graph
-        self.plot_graph(cs, damage, plates, turret, kills, epic, is_melee, completion_time)
-        
-    def display_results(self, completion_time, reductions):
+
+        cs_mid, cs_other, damage, is_melee, plates_mid, plates_other, turrets_mid, turrets_other, kills, epic = inputs
+
+        completion_time, breakdown = calculate_completion_time(
+            cs_mid,  # CS per minute
+            cs_other,  # CS per minute
+            damage,  # Damage per minute
+            is_melee,
+            plates_mid, plates_other,
+            turrets_mid, turrets_other,
+            kills, epic
+        )
+
+        self.display_results(completion_time, breakdown, cs_mid, cs_other, damage, is_melee)
+        self.plot_graph(cs_mid, cs_other, damage, is_melee, plates_mid, plates_other,
+                        turrets_mid, turrets_other, kills, epic, completion_time)
+
+    def display_results(self, completion_time, breakdown, cs_mid, cs_other, damage, is_melee):
         """Display calculation results in the text area."""
         self.results_text.delete(1.0, tk.END)
-        
-        minutes = int(completion_time)
-        seconds = int((completion_time - minutes) * 60)
-        
+
+        minutes = int(completion_time * 60) // 60
+        seconds = int(completion_time * 60) % 60
+
+        champ_type = "Melee (3%)" if is_melee else "Ranged (1.5%)"
+
         results = f"Quest Completion Time: {minutes}m {seconds}s\n"
-        results += f"({completion_time:.2f} minutes)\n\n"
-        results += "Time Reduction Breakdown:\n"
-        results += "=" * 35 + "\n"
-        results += f"CS:               {reductions['cs']:.1f} seconds\n"
-        results += f"Champion Damage:  {reductions['damage']:.1f} seconds\n"
-        results += f"Turret Plates:    {reductions['plates']:.1f} seconds\n"
-        results += f"Turret Destroy:   {reductions['turret']:.1f} seconds\n"
-        results += f"Champion Kills:   {reductions['kills']:.1f} seconds\n"
-        results += f"Epic Monsters:    {reductions['epic_monsters']:.1f} seconds\n"
-        results += "=" * 35 + "\n"
-        results += f"Total Reduction:  {reductions['total']:.1f} seconds\n"
-        results += f"                  ({reductions['total']/60:.2f} minutes)\n"
-        
+        results += "Points Breakdown:\n"
+        results += "=" * 40 + "\n"
+        results += f"CS in Mid Lane:      {breakdown['cs_mid']:.0f} pts\n"
+        results += f"CS in Other Lanes:   {breakdown['cs_other']:.0f} pts\n"
+        results += f"  Total CS:          {breakdown['cs_total']:.0f} pts\n\n"
+        results += f"Champion Damage ({champ_type}): {breakdown['damage']:.0f} pts\n\n"
+        results += f"Turret Plates:       {breakdown['plates']:.0f} pts\n"
+        results += f"Turret Takedowns:    {breakdown['turrets']:.0f} pts\n"
+        results += f"Champion Kills:      {breakdown['kills']:.0f} pts\n"
+        results += f"Epic Monsters:       {breakdown['epic']:.0f} pts\n"
+        results += "=" * 40 + "\n"
+        results += f"Active Points:       {breakdown['active_total']:.0f} pts\n"
+        results += f"Passive Points:      {breakdown['passive_total']:.0f} pts\n"
+        results += f"TOTAL:               {breakdown['active_total'] + breakdown['passive_total']:.0f} pts\n\n"
+
+        # Time saved calculation
+        time_saved = int((BASE_COMPLETION_TIME - completion_time) * 60) // 60
+        time_saved_seconds = int(
+            (BASE_COMPLETION_TIME - completion_time) * 60 % 60)
+        results += f"Time Saved: {time_saved}m {time_saved_seconds}s\n"
+
         self.results_text.insert(1.0, results)
-        
-    def plot_graph(self, cs, damage, plates, turret, kills, epic, is_melee, completion_time):
+
+    def plot_graph(self, cs_mid, cs_other, damage, is_melee, plates_mid, plates_other,
+                   turrets_mid, turrets_other, kills, epic, completion_time):
         """Plot the quest accumulation curve."""
         self.ax.clear()
-        
+
         # Plot baseline
-        time_baseline = np.linspace(0, BASE_COMPLETION_TIME, 100)
-        points_baseline = PASSIVE_POINTS_PER_MINUTE * time_baseline
+        time_baseline = np.linspace(0, BASE_COMPLETION_TIME, 200)
+        points_baseline = np.array(
+            [calculate_passive_points(t) for t in time_baseline])
         percentage_baseline = (points_baseline / TOTAL_QUEST_POINTS) * 100
         percentage_baseline = np.minimum(100, percentage_baseline)
-        
-        self.ax.plot(time_baseline, percentage_baseline, '--', color='gray', 
-                    label='Passive Only (Baseline)', linewidth=2, alpha=0.7, zorder=1)
-        
-        # Plot comparison scenarios first (so they appear behind current scenario)
-        colors = ['green', 'orange', 'purple', 'brown', 'pink', 'cyan', 'olive', 'navy']
+
+        self.ax.plot(time_baseline, percentage_baseline, '--', color='gray',
+                     label=f'{int(BASE_COMPLETION_TIME * 60 // 60)}m{int(BASE_COMPLETION_TIME * 60 % 60)}s Passive Only', linewidth=2, alpha=0.7, zorder=1)
+
+        # Plot comparison scenarios first
+        colors = ['green', 'orange', 'purple',
+                  'brown', 'pink', 'cyan', 'olive', 'navy']
         for i, scenario in enumerate(self.comparison_scenarios):
             color = colors[i % len(colors)]
-            scenario_percentage = (scenario['points'] / TOTAL_QUEST_POINTS) * 100
+            scenario_percentage = (
+                scenario['points'] / TOTAL_QUEST_POINTS) * 100
             scenario_percentage = np.minimum(100, scenario_percentage)
-            self.ax.plot(scenario['time'], scenario_percentage, '-', 
-                        color=color, label=scenario['label'], linewidth=2, alpha=0.7, zorder=2)
-        
-        # Plot current scenario on top with bright blue
+            self.ax.plot(scenario['time'], scenario_percentage, '-',
+                         color=color, label=scenario['label'], linewidth=2, alpha=0.7, zorder=2)
+
+        # Plot current scenario on top
         time_points, quest_points = generate_accumulation_curve(
-            cs, damage, plates, turret, kills, epic, is_melee, completion_time
+            cs_mid, cs_other, damage, is_melee, plates_mid, plates_other,
+            turrets_mid, turrets_other, kills, epic, completion_time
         )
         percentage_complete = (quest_points / TOTAL_QUEST_POINTS) * 100
         percentage_complete = np.minimum(100, percentage_complete)
-        
-        self.ax.plot(time_points, percentage_complete, '-', color='#0066FF', 
-                    label='Current Scenario', linewidth=3, zorder=3)
-        
-        # Quest completion threshold (now at y=100%)
-        self.ax.axhline(y=100, color='red', linestyle=':', 
-                       label='Quest Completion', linewidth=2, zorder=0)
-        
-        # Mark completion point
-        if completion_time <= max(time_points):
-            self.ax.plot(completion_time, 100, 'o', color='red', markersize=10, 
-                        label=f'Completion: {completion_time:.2f}m', zorder=4)
-        
+        minutes = int(completion_time * 60) // 60
+        seconds = int(completion_time * 60) % 60
+        self.ax.plot(time_points, percentage_complete, '-', color='#0066FF',
+                     label=f"{minutes}m{seconds}s Current", linewidth=3, zorder=3)
+
+        # Quest completion threshold
+        self.ax.axhline(y=100, color='red', linestyle=':',
+                        label='Quest Completion', linewidth=2, zorder=0)
+
         self.ax.set_xlabel('Game Time (minutes)', fontsize=12)
         self.ax.set_ylabel('Quest Completion (%)', fontsize=12)
-        self.ax.set_title('Role Quest - Completion Progress', fontsize=14, fontweight='bold')
+        self.ax.set_title('MID LANE Quest - Completion Progress',
+                          fontsize=14, fontweight='bold')
         self.ax.legend(loc='best', framealpha=0.9)
         self.ax.grid(True, alpha=0.3)
-        
-        # Set reasonable axis limits
+
         self.ax.set_xlim(0, max(BASE_COMPLETION_TIME, completion_time) + 1)
         self.ax.set_ylim(-5, 110)
-        
+
         self.canvas.draw()
-        
+
     def add_comparison(self):
         """Add current scenario to comparison list."""
         inputs = self.get_inputs()
         if inputs is None:
             return
-        
-        cs, damage, plates, turret, kills, epic, is_melee = inputs
-        
-        reductions = calculate_time_reduction(cs, damage, plates, turret, kills, epic, is_melee)
-        completion_time = calculate_completion_time(reductions['total'])
-        
-        time_points, quest_points = generate_accumulation_curve(
-            cs, damage, plates, turret, kills, epic, is_melee, completion_time
+
+        cs_mid, cs_other, damage, is_melee, plates_mid, plates_other, turrets_mid, turrets_other, kills, epic = inputs
+
+        completion_time, _ = calculate_completion_time(
+            cs_mid, cs_other, damage, is_melee,
+            plates_mid, plates_other,
+            turrets_mid, turrets_other,
+            kills, epic
         )
-        
-        # Build default label with smart formatting
+
+        time_points, quest_points = generate_accumulation_curve(
+            cs_mid, cs_other, damage, is_melee, plates_mid, plates_other,
+            turrets_mid, turrets_other, kills, epic, completion_time
+        )
+
+        # Build default label
         minutes = int(completion_time)
         seconds = int((completion_time - minutes) * 60)
-        
+
         label_parts = [f"{minutes}m{seconds}s"]
-        
-        if cs > 0:
-            label_parts.append(f"{cs:.1f} CS/Min")
-        
+
+        total_cs = cs_mid + cs_other
+        if total_cs > 0:
+            label_parts.append(f"{total_cs:.1f} CS/Min")
+
         if damage > 0:
-            label_parts.append(f"{damage:.0f} Dmg/Min")
-        
-        # Add champion type only if damage is being dealt
-        if damage > 0:
-            label_parts.append("Melee" if is_melee else "Ranged")
-        
+            label_parts.append(f"{int(damage)} DPM")
+
         if kills > 0:
             label_parts.append(f"{kills} KP")
-        
-        # Calculate total plates (in-lane + other lanes)
-        total_plates = plates
+
+        total_plates = plates_mid + plates_other
         if total_plates > 0:
-            label_parts.append(f"{total_plates} Plates")
-        
+            label_parts.append(f"{int(total_plates)} Plates")
+
         if epic > 0:
             label_parts.append(f"{epic} Epics")
-        
+
+        champ_type = "M" if is_melee else "R"
+        label_parts.append(champ_type)
+
         default_label = " ".join(label_parts)
-        
+
         # Create custom dialog for label input
         dialog = tk.Toplevel(self.root)
         dialog.title("Label Comparison Scenario")
         dialog.geometry("450x150")
         dialog.transient(self.root)
         dialog.grab_set()
-        
-        ttk.Label(dialog, text="Enter a label for this scenario:", font=('TkDefaultFont', 10)).pack(pady=10)
-        
+
+        ttk.Label(dialog, text="Enter a label for this scenario:",
+                  font=('TkDefaultFont', 10)).pack(pady=10)
+
         label_var = tk.StringVar(value=default_label)
         entry = ttk.Entry(dialog, textvariable=label_var, width=60)
         entry.pack(pady=10)
         entry.select_range(0, tk.END)
         entry.focus()
-        
+
         def on_ok():
             label = label_var.get().strip()
             if not label:
                 label = default_label
-            
+
             self.comparison_scenarios.append({
                 'time': time_points,
                 'points': quest_points,
                 'label': label,
                 'completion_time': completion_time
             })
-            
+
             dialog.destroy()
             self.calculate()
-            messagebox.showinfo("Added", f"Scenario added to comparison (Total: {len(self.comparison_scenarios)})")
-        
+            messagebox.showinfo(
+                "Added", f"Scenario added (Total: {len(self.comparison_scenarios)})")
+
         def on_cancel():
             dialog.destroy()
-        
+
         button_frame = ttk.Frame(dialog)
         button_frame.pack(pady=10)
-        ttk.Button(button_frame, text="OK", command=on_ok).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="Cancel", command=on_cancel).pack(side=tk.LEFT, padx=5)
-        
-        # Bind Enter key to OK
+        ttk.Button(button_frame, text="OK", command=on_ok).pack(
+            side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Cancel",
+                   command=on_cancel).pack(side=tk.LEFT, padx=5)
+
         entry.bind('<Return>', lambda e: on_ok())
         dialog.bind('<Escape>', lambda e: on_cancel())
-        
+
     def clear_comparisons(self):
         """Clear all comparison scenarios."""
         self.comparison_scenarios = []
@@ -563,7 +730,7 @@ class QuestCalculatorGUI:
 
 def main():
     root = tk.Tk()
-    app = QuestCalculatorGUI(root)
+    app = MidLaneQuestCalculatorGUI(root)
     root.mainloop()
 
 

@@ -118,35 +118,50 @@ def calculate_passive_points(time_minutes):
     return points
 
 
-def calculate_completion_time(cs_in_bot, cs_in_other, plates_bot, plates_other,
+def calculate_completion_time(cs_per_min_bot, cs_per_min_other, plates_bot, plates_other,
                               turrets_bot, turrets_other, kills, epic_monsters):
     """
     Calculate quest completion time given performance metrics.
     
+    Args:
+        cs_per_min_bot: CS per minute in bot lane
+        cs_per_min_other: CS per minute in other lanes
+        plates_bot: Turret plates in bot lane (0-5)
+        plates_other: Turret plates in other lanes
+        turrets_bot: Turrets destroyed in bot lane
+        turrets_other: Turrets destroyed in other lanes
+        kills: Champion takedowns
+        epic_monsters: Epic monster takedowns
+    
     Returns:
         Tuple of (completion_time, points_breakdown)
     """
-    # Calculate points from CS
-    cs_points = calculate_points_from_cs(cs_in_bot, cs_in_other)
-    
-    # Calculate points from objectives
+    # Calculate points from objectives (these don't depend on time)
     obj_breakdown = calculate_points_from_objectives(
         plates_bot, plates_other, turrets_bot, turrets_other, kills, epic_monsters
     )
+    objective_points = obj_breakdown['total']
     
-    # Total active points (non-passive)
-    active_points = cs_points + obj_breakdown['total']
-    
-    # We need to find the time where passive_points(t) + active_points = TOTAL_QUEST_POINTS
-    # This requires solving: calculate_passive_points(t) + active_points = 1350
+    # We need to find time t where:
+    # passive_points(t) + cs_points(t) + objective_points = TOTAL_QUEST_POINTS
+    # Where cs_points(t) = (cs_per_min_bot * t * POINTS_PER_MINION_BOT) + (cs_per_min_other * t * POINTS_PER_MINION_OTHER)
     
     # Use binary search to find completion time
-    low, high = 0.0, 20.0  # Search between 0 and 20 minutes
+    low, high = PASSIVE_START_TIME, 30.0  # Search between 1:05 and 30 minutes
     tolerance = 0.001  # 0.001 minute precision (~0.06 seconds)
     
     while high - low > tolerance:
         mid = (low + high) / 2
-        total_points = calculate_passive_points(mid) + active_points
+        
+        # Calculate points at this time
+        passive = calculate_passive_points(mid)
+        
+        # CS accumulated up to this time
+        time_farming = mid  # Time spent in game
+        cs_points = (cs_per_min_bot * time_farming * POINTS_PER_MINION_BOT + 
+                     cs_per_min_other * time_farming * POINTS_PER_MINION_OTHER)
+        
+        total_points = passive + cs_points + objective_points
         
         if total_points < TOTAL_QUEST_POINTS:
             low = mid
@@ -155,16 +170,22 @@ def calculate_completion_time(cs_in_bot, cs_in_other, plates_bot, plates_other,
     
     completion_time = (low + high) / 2
     
-    # Build detailed breakdown
+    # Build detailed breakdown at completion time
+    final_cs_bot_total = cs_per_min_bot * completion_time
+    final_cs_other_total = cs_per_min_other * completion_time
+    
     breakdown = {
-        'cs_bot': cs_in_bot * POINTS_PER_MINION_BOT,
-        'cs_other': cs_in_other * POINTS_PER_MINION_OTHER,
-        'cs_total': cs_points,
+        'cs_bot': final_cs_bot_total * POINTS_PER_MINION_BOT,
+        'cs_other': final_cs_other_total * POINTS_PER_MINION_OTHER,
+        'cs_total': (final_cs_bot_total * POINTS_PER_MINION_BOT + 
+                     final_cs_other_total * POINTS_PER_MINION_OTHER),
         'plates': obj_breakdown['plates'],
         'turrets': obj_breakdown['turrets'],
         'kills': obj_breakdown['kills'],
         'epic': obj_breakdown['epic'],
-        'active_total': active_points,
+        'active_total': (final_cs_bot_total * POINTS_PER_MINION_BOT + 
+                        final_cs_other_total * POINTS_PER_MINION_OTHER + 
+                        obj_breakdown['total']),
         'passive_total': calculate_passive_points(completion_time)
     }
     
@@ -414,10 +435,10 @@ class BotLaneQuestCalculatorGUI:
         
         cs_bot, cs_other, plates_bot, plates_other, turrets_bot, turrets_other, kills, epic = inputs
         
-        # Calculate total CS at completion for curve generation
+        # Pass CS rates (per minute), not totals
         completion_time, breakdown = calculate_completion_time(
-            cs_bot * BASE_COMPLETION_TIME,  # Approximate total CS
-            cs_other * BASE_COMPLETION_TIME,
+            cs_bot,  # CS per minute
+            cs_other,  # CS per minute
             plates_bot, plates_other,
             turrets_bot, turrets_other,
             kills, epic

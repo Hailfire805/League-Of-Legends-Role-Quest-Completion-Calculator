@@ -18,6 +18,16 @@ Perfect for:
 - Comparing aggressive vs. farm-focused playstyles
 - Educational content and game analysis
 
+## ScreenShots
+
+![Mid Lane Breakdown](Images/mid_lane.png)
+
+![Top Lane Breakdown](Images/top_lane.png)
+
+![Bot Lane Breakdown](Images/bot_lane.png)
+
+![Point Breakdown Panel](Images/point_breakdown.png)
+![Performance Metrics Panel](Images/performance_metrics.png)
 ## Requirements
 
 - **Python 3.8 or higher**
