@@ -1,22 +1,68 @@
-# LoL Role Quest Completion Calculators
-
-## Overview
-
-A suite of Python applications for calculating and visualizing League of Legends Season 2025 role quest completion times. Each calculator is tailored to a specific lane (Top, Mid, Bot) with accurate point values and passive generation mechanics based on official game data.
+Ever wondered exactly when your role quest will finish based on your playstyle? I built a set of calculators that show you the exact completion time and visualize your progress throughout the game.
 
 ## What This Does
+These calculators let you input your typical game stats (CS/min, kills, plates, objectives, etc.) and instantly see:
+Exact quest completion time down to the second
+Visual progression graph showing your quest completion % over time
+Scenario comparisons - compare aggressive vs. farm-focused playstyles side-by-side
+Detailed breakdown of how each metric contributes to faster completion
+Perfect for planning your early game, understanding which objectives matter most for your role, or just satisfying your curiosity about quest mechanics.
 
-These calculators help you understand **when your role quest will complete** based on your in-game performance. Input your CS/min, kills, objectives, and other metrics to see:
-- Exact completion time
-- Visual progression graph showing quest completion percentage over time
-- Comparison between different playstyles and scenarios
-- Breakdown of how each metric contributes to faster completion
+## Screenshots
+![Mid Lane Breakdown](Images/mid_lane.png)
 
-Perfect for:
-- Planning your early game strategy
-- Understanding which objectives matter most for your role
-- Comparing aggressive vs. farm-focused playstyles
-- Educational content and game analysis
+![Top Lane Breakdown](Images/top_lane.png)
+
+![Bot Lane Breakdown](Images/bot_lane.png)
+
+![Point Breakdown Panel](Images/point_breakdown.png)
+![Performance Metrics Panel](Images/performance_metrics.png)
+
+## Example Use Cases
+- "If I average 7 CS/min and get first tower plus all 5 plates, when do I complete as a mid laner?"
+10:37
+- "How much faster is getting 3 kills vs. 2 extra plates as a top laner?"
+3 kills = 28 seconds faster vs 2 plates = 50 seconds faster
+- "How much faster would my quest finish if I improve my CS from 6 to 8 per minute as a bot laner?"
++2 CS/min = 57 seconds faster
+- "How much does roaming hurt my quest completion time?"
+   - Every 15 seconds out of lane = will require 12 additional seconds of in-lane time to compensate
+   - 1 minute out of lane = ~48 additional seconds in-lane needed
+
+## Features
+- Lane-specific calculators for Top, Mid, and Bot with accurate point values
+- Interactive graphs with zoom/pan controls and the ability to compare multiple scenarios
+- Cross-platform - works on Windows, macOS, and Linux
+
+## Game Mechanics Implemented
+Based on official Season 2025 role quest data:
+
+### All Lanes
+
+- 96 Points/min passive generation starting at 1:05 (in lane only)
+- 20 Points/min when out of lane
+- 50 Points per turret destroyed in assigned lane, 25 in other lanes
+- 40 Points per turret plate destroyed in assigned lane, 20 in other lanes
+- 30 Points per epic monster (Dragon, Rift Herald, Baron)
+
+### Top Lane
+
+- 1200 points to complete
+- 2 Points per CS in top lane, 1 point elsewhere
+- 15 Points per takedown
+
+### Bot Lane
+
+- 1350 points to complete
+- 3 Points per CS in bot lane, 1.5 points elsewhere
+- 15 Points per takedown
+
+### Mid Lane
+
+- 1350 points to complete
+- 2 Points per CS in mid lane, 1 point elsewhere
+- 25 Points per takedown (higher than other lanes)
+- Champion damage bonus: 3% (melee) or 1.5% (ranged) of damage dealt to champions
 
 ## Requirements
 
@@ -53,14 +99,13 @@ Perfect for:
 
 ## Quick Start
 
-### Option 1: Standalone EXE (Easiest - No Python Required!)
-**Windows users only - Download the .exe version if available**
-1. Download `LoL_Quest_Calculator.exe`
-2. Double-click to run
-3. Select your lane from the menu
-4. Done!
-
-*No installation needed - the .exe includes everything*
+### Option 1: Use The Executable For The Desired Lane
+1. Use the links below to download the pre-packaged Executables for your lane (File Downloads via GitHub Releases, 38 MB each):
+   - Top Lane: [`LoL_Quest_Calculator_Top.exe`](https://github.com/Hailfire805/League-Of-Legends-Role-Quest-Completion-Calculator/releases/download/V1.0.0/LoL_Quest_Calculator_Top.exe)
+   - Mid Lane: [`LoL_Quest_Calculator_Mid.exe`](https://github.com/Hailfire805/League-Of-Legends-Role-Quest-Completion-Calculator/releases/download/V1.0.0/LoL_Quest_Calculator_Mid.exe)
+   - Bot Lane: [`LoL_Quest_Calculator_Bot.exe`](https://github.com/Hailfire805/League-Of-Legends-Role-Quest-Completion-Calculator/releases/download/V1.0.0/LoL_Quest_Calculator_Bot.exe)
+2. Run the downloaded `.exe` file directly (no installation needed)
+3. Input your typical game stats in the GUI and hit "Calculate" or "Add to Comparison" to view multiple scenarios
 
 ### Option 2: Double-Click Launcher
 **Windows users:**
@@ -106,7 +151,7 @@ The launcher will automatically:
 ## How to Use
 
 1. **Enter your performance metrics** in the left panel:
-   - CS per minute (separated by lane)
+   - CS per minute
    - Champion damage per minute (Mid Lane only)
    - Turret plates secured
    - Turrets destroyed
@@ -128,106 +173,8 @@ The launcher will automatically:
    - Use the home button to reset the view
    - Save graphs as images with the save button
 
-## Lane-Specific Details
-
-## Lane-Specific Quest Mechanics
-
-### Top Lane (1200 points)
-- **Quest starts at**: 1:05 game time
-- **Passive generation**: 96 points/minute (8 points every 5 seconds) when in top lane
-- **Baseline completion**: ~13.6 minutes
-- **Minion kills**: 2 points in top lane, 1 point in other lanes
-- **Turret takedowns**: 50 points in top lane, 25 points in other lanes
-- **Turret plates**: 40 points in top lane, 20 points in other lanes
-- **Champion takedowns**: 15 points
-- **Epic monsters**: 30 points
-
-### Bot Lane (1350 points)
-- **Quest starts at**: 1:05 game time
-- **Passive generation**: 96 points/minute (8 points every 5 seconds) when in bot lane
-- **Baseline completion**: ~15.1 minutes
-- **Minion kills**: 3 points in bot lane, 1.5 points in other lanes
-- **Turret takedowns**: 50 points in bot lane, 25 points in other lanes
-- **Turret plates**: 40 points in bot lane, 20 points in other lanes
-- **Champion takedowns**: 15 points
-- **Epic monsters**: 30 points
-
-### Mid Lane (1350 points)
-- **Minion kills**: 2 points in mid lane, 1 point in other lanes
-- **Turret takedowns**: 50 points in mid lane, 25 points in other lanes
-- **Turret plates**: 40 points in mid lane, 20 points in other lanes
-- **Champion takedowns**: 25 points
-- **Epic monsters**: 30 points
-- **Champion damage**: Gain (3% / 1.5%) of damage dealt to champions as points (melee / ranged)
-- **Special note**: Gold and experience from minions is reduced by 25% outside of mid lane until level 3
-
-> **Important**: The passive generation only occurs when you're in your designated lane. Roaming or lane swapping will slow your quest completion.
-
-## Common Features (All Calculators)
-
-### Input Parameters
-- **CS per Minute**: Your average creep score rate (separated by lane for Top/Bot calculators)
-- **Champion Damage per Minute**: Damage dealt to enemy champions (Mid Lane only)
-- **Champion Type**: Melee or Ranged (Mid Lane only - affects damage conversion rate)
-- **Turret Plates**: Number of plates secured (0-5), separated by lane
-- **Turret Takedowns**: Number of turrets destroyed, separated by lane
-- **Champion Takedowns**: Number of kills/assists
-- **Epic Monster Takedowns**: Dragons, barons, etc.
-
-### Outputs
-- Quest completion time in minutes and seconds
-- Breakdown showing time reduction from each source
-- Accumulation curve graph showing quest progress over time
-- Baseline comparison (passive generation only)
-
 ### Comparison Feature
 Click "Add to Comparison" to save the current scenario, then modify inputs and calculate again. The graph will overlay multiple scenarios for easy comparison.
-
-## Updating Conversion Formulas
-
-All conversion constants are defined at the top of each script. The formulas have been set based on official League of Legends role quest data, but if adjustments are needed:
-
-**For Mid Lane** (quest_timer_calculator.py):
-```python
-# Lines 15-40 contain constants like:
-PASSIVE_POINTS_PER_MINUTE = 100
-TIME_REDUCTION_PER_KILL = 15
-# ... etc
-```
-
-**For Top Lane** (quest_timer_calculator_top.py):
-```python
-# Lines 20-50 contain constants like:
-TOTAL_QUEST_POINTS = 1200
-POINTS_PER_MINION_TOP = 2
-POINTS_PER_MINION_OTHER = 1
-# ... etc
-```
-
-**For Bot Lane** (quest_timer_calculator_bot.py):
-```python
-# Lines 20-50 contain constants like:
-TOTAL_QUEST_POINTS = 1350
-POINTS_PER_MINION_BOT = 3
-POINTS_PER_MINION_OTHER = 1.5
-# ... etc
-```
-
-## Graph Interpretation
-
-The graphs display **quest completion percentage** over time, making it intuitive to track progress toward 100%.
-
-- **Gray dashed line**: Baseline passive generation
-- **Blue solid line**: Your current scenario (showing faster completion)
-- **Red dotted line**: Quest completion threshold (at Y = 100%)
-- **Red circle**: Marks when your quest completes (at 100%)
-- **Colored lines**: Comparison scenarios with custom labels
-- **Y-axis**: Quest completion percentage (0% to 100%)
-- **X-axis**: Game time in minutes
-
-The graph shows how completion percentage increases over the course of the game. Steeper upward slopes indicate faster quest completion due to CS, kills, objectives, and damage (Mid Lane). When a line reaches Y = 100%, the quest is complete.
-
-## New Features
 
 ### Custom Comparison Labels
 When adding a scenario to comparison, you'll be prompted to enter a custom label. This allows you to name scenarios meaningfully (e.g., "Aggressive Early", "Farm Focus", "With First Blood") rather than using generic numbering.
@@ -267,23 +214,11 @@ The matplotlib toolbar below the graph provides zoom and pan controls:
 - This is normal on first launch as matplotlib initializes
 - Subsequent calculations should be faster
 
-## Customization
-
-All conversion formulas are defined as constants at the top of each calculator file. If you want to adjust values for testing or as the game is patched, simply edit these constants:
-
-```python
-# Example from quest_timer_calculator_top.py
-PASSIVE_POINTS_PER_MINUTE = 96
-TOTAL_QUEST_POINTS = 1200
-POINTS_PER_MINION_TOP = 2
-# ... etc
-```
-
 ## Credits
 
 Calculators created for League of Legends Season 2025 role quest research and analysis.
 
-Quest mechanics and point values sourced from official Riot Games documentation and in-game testing.
+Quest mechanics and point values sourced from the official League of Legends Wiki, which can be found here: League of Legends Role Quests
 
 ## License
 
