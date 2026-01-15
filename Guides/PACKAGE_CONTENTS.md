@@ -2,7 +2,7 @@
 
 ## Core Application Files (Required)
 - `quest_timer_calculator.py` - Mid Lane calculator
-- `quest_timer_calculator_top.py` - Top Lane calculator  
+- `quest_timer_calculator_top.py` - Top Lane calculator
 - `quest_timer_calculator_bot.py` - Bot Lane calculator
 - `launcher.py` - Python menu launcher (cross-platform)
 - `requirements.txt` - Python package dependencies
@@ -77,15 +77,8 @@ Feel free to modify, fork, or improve!
 
 ---
 
-## File Sizes (Approximate)
-- Total package: ~150-200 KB (code only)
-- With screenshots: ~2-5 MB (depending on image quality)
-- No external dependencies downloaded until first run
-
----
-
 ## Version Information
-Version: 1.0
+Version: 1.0.1
 Release Date: 1/15/2026
 Compatible with: League of Legends Season 2025
 Python Version: 3.8+
@@ -96,6 +89,5 @@ Python Version: 3.8+
 
 If you're sharing this tool, consider:
 - Creating a GitHub repository for bug reports and feature requests
-- Setting up a Discord server for community support
 - Monitoring the forum thread for feedback
 - Updating the calculators when Riot patches quest mechanics
