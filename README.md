@@ -20,7 +20,7 @@ Perfect for planning your early game, understanding which objectives matter most
 
 ## Example Use Cases
 - "If I average 7 CS/min and get first tower plus all 5 plates, when do I complete as a mid laner?"
-10:37
+10:56
 - "How much faster is getting 3 kills vs. 2 extra plates as a top laner?"
 3 kills = 28 seconds faster vs 2 plates = 50 seconds faster
 - "How much faster would my quest finish if I improve my CS from 6 to 8 per minute as a bot laner?"
