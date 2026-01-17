@@ -143,11 +143,66 @@ def calculate_completion_time(cs_per_min_mid, cs_per_min_other, damage_per_min,
                               turrets_mid, turrets_other, kills, epic_monsters):
     """
     Calculate quest completion time given performance metrics.
-    
-    Properly handles CS and damage as rates (per minute) instead of totals.
+
+    This function uses a binary search algorithm to find the exact time when the quest
+    completes (reaches 1350 points). We use binary search because quest completion is
+    an inverse problem: we know the target points (1350) and need to find the time.
+
+    The quest point formula is:
+        total_points(t) = passive_points(t) + cs_points(t) + damage_points(t) + objective_points
+
+    Where:
+        - passive_points(t): 96 points/min after 1:05 (time-dependent, non-linear)
+        - cs_points(t): CS rate * time * points per CS (linear with time)
+        - damage_points(t): Damage rate * time * conversion rate (linear with time)
+        - objective_points: Fixed value (independent of time)
+
+    Binary Search Strategy:
+        - Search space: [1.083, 30.0] minutes (from passive start to max game time)
+        - Convergence tolerance: 0.001 minutes (~0.06 seconds precision)
+        - Invariant: At each iteration, the completion time lies in [low, high]
+        - Terminates when high - low <= 0.001 minutes
+
+    Args:
+        cs_per_min_mid (float): Minion kills per minute in mid lane (typically 5-10)
+        cs_per_min_other (float): Minion kills per minute in other lanes (typically 0-3)
+        damage_per_min (float): Champion damage per minute (typically 300-1500)
+        is_melee (bool): True if champion is melee (3% conversion), False if ranged (1.5%)
+        plates_mid (int): Turret plates destroyed in mid lane (0-5)
+        plates_other (int): Turret plates destroyed in other lanes (0-10)
+        turrets_mid (int): Full turrets destroyed in mid lane (0-3)
+        turrets_other (int): Full turrets destroyed in other lanes (0-8)
+        kills (int): Champion takedowns (kills + assists)
+        epic_monsters (int): Epic monster takedowns (dragons, heralds, barons)
 
     Returns:
-        Tuple of (completion_time, points_breakdown)
+        tuple: (completion_time, breakdown) where:
+            - completion_time (float): Time in minutes when quest completes
+            - breakdown (dict): Detailed point breakdown with keys:
+                - 'cs_mid': Points from mid lane CS
+                - 'cs_other': Points from other lane CS
+                - 'cs_total': Total CS points
+                - 'damage': Points from champion damage
+                - 'plates': Points from turret plates
+                - 'turrets': Points from full turrets
+                - 'kills': Points from champion kills
+                - 'epic': Points from epic monsters
+                - 'active_total': Sum of all active point sources
+                - 'passive_total': Passive generation points
+
+    Example:
+        >>> # Calculate for a typical mid lane game
+        >>> time, breakdown = calculate_completion_time(
+        ...     cs_per_min_mid=7.0,
+        ...     cs_per_min_other=0.5,
+        ...     damage_per_min=600,
+        ...     is_melee=False,
+        ...     plates_mid=2, plates_other=0,
+        ...     turrets_mid=0, turrets_other=0,
+        ...     kills=5, epic_monsters=1
+        ... )
+        >>> print(f"Quest completes at {time:.2f} minutes")
+        Quest completes at 11.47 minutes
     """
     # Calculate points from objectives
     obj_breakdown = calculate_points_from_objectives(
@@ -155,8 +210,17 @@ def calculate_completion_time(cs_per_min_mid, cs_per_min_other, damage_per_min,
     )
     objective_points = obj_breakdown['total']
 
-    # Use binary search to find completion time where:
-    # passive_points(t) + cs_points(t) + damage_points(t) + objective_points = TOTAL_QUEST_POINTS
+    # Binary search to find completion time where total points = TOTAL_QUEST_POINTS (1350)
+    #
+    # Why binary search?
+    # - The point accumulation function is monotonically increasing (more time = more points)
+    # - We need to solve for t in: f(t) = 1350, where f(t) is complex and non-linear
+    # - Binary search converges in O(log n) iterations, typically 15-20 iterations
+    #
+    # Search bounds:
+    # - low: PASSIVE_START_TIME (1.083 min) - earliest possible completion
+    # - high: 30.0 min - conservative upper bound (games rarely go this long)
+    # - tolerance: 0.001 min ≈ 0.06 seconds - more precision is unnecessary for game times
     low, high = PASSIVE_START_TIME, 30.0
     tolerance = 0.001
 
@@ -207,10 +271,58 @@ def generate_accumulation_curve(cs_per_min_mid, cs_per_min_other, damage_per_min
                                 is_melee, plates_mid, plates_other, turrets_mid,
                                 turrets_other, kills, epic_monsters, completion_time):
     """
-    Generate point accumulation curve over time.
+    Generate point accumulation curve over time for visualization.
+
+    This function creates 1000 data points representing how quest points accumulate from
+    game start to beyond completion time. This data is used to plot the quest progress
+    graph in the GUI.
+
+    Visualization Strategy:
+        The curve uses a LINEAR DISTRIBUTION model for simplicity and clarity in the graph:
+        - CS and damage accumulate linearly with time (constant rates)
+        - Objectives (plates, turrets, kills) are distributed linearly across the completion time
+        - This is a SIMPLIFICATION for visualization - in reality, objectives happen discretely
+
+    Why Linear Distribution?
+        - Creates smooth, readable graphs that show overall point accumulation trends
+        - Avoids step functions that would make comparison graphs cluttered
+        - The completion time is accurate; the curve shape is illustrative
+        - For planning purposes, knowing "when quest completes" matters more than exact event timing
+
+    Args:
+        cs_per_min_mid (float): Minion kills per minute in mid lane
+        cs_per_min_other (float): Minion kills per minute in other lanes
+        damage_per_min (float): Champion damage per minute
+        is_melee (bool): True if champion is melee (affects damage conversion rate)
+        plates_mid (int): Turret plates destroyed in mid lane
+        plates_other (int): Turret plates destroyed in other lanes
+        turrets_mid (int): Full turrets destroyed in mid lane
+        turrets_other (int): Full turrets destroyed in other lanes
+        kills (int): Champion takedowns (kills + assists)
+        epic_monsters (int): Epic monster takedowns
+        completion_time (float): Calculated quest completion time in minutes
 
     Returns:
-        Tuple of (time_array, points_array) for plotting
+        tuple: (time_points, quest_points) where:
+            - time_points (np.ndarray): Array of 1000 time values from 0 to max_time
+            - quest_points (np.ndarray): Array of 1000 quest point values at each time
+            - max_time = max(completion_time, BASE_COMPLETION_TIME) + 1 minute
+
+    Implementation Details:
+        - Uses numpy.linspace to create 1000 evenly spaced time points
+        - Calculates passive points at each time (kicks in after 1:05)
+        - Scales active points (CS, damage, objectives) linearly by progress ratio
+        - Progress ratio = min(current_time / completion_time, 1.0) ensures capping at 100%
+
+    Example:
+        >>> time_arr, points_arr = generate_accumulation_curve(
+        ...     cs_per_min_mid=7.0, cs_per_min_other=0, damage_per_min=500,
+        ...     is_melee=False, plates_mid=2, plates_other=0,
+        ...     turrets_mid=0, turrets_other=0, kills=3, epic_monsters=1,
+        ...     completion_time=12.5
+        ... )
+        >>> # time_arr and points_arr can now be plotted with matplotlib
+        >>> plt.plot(time_arr, points_arr)
     """
     max_time = max(completion_time, BASE_COMPLETION_TIME) + 1
     time_points = np.linspace(0, max_time, 1000)
@@ -254,6 +366,36 @@ def generate_accumulation_curve(cs_per_min_mid, cs_per_min_other, damage_per_min
 
 class MidLaneQuestCalculatorGUI:
     def __init__(self, root):
+        """
+        Initialize the Mid Lane Quest Calculator GUI application.
+
+        This constructor sets up the main application window and initializes the state
+        management for scenario comparisons. The UI is constructed through the setup_ui()
+        method, which creates all input fields, buttons, and the matplotlib graph canvas.
+
+        Args:
+            root (tk.Tk): The root Tkinter window object that will contain this application.
+                         This should be an initialized Tk() instance.
+
+        Attributes Created:
+            root (tk.Tk): Reference to the main application window
+            comparison_scenarios (list): Empty list to store comparison scenario data.
+                                       Each scenario is a dict with keys:
+                                       - 'time': numpy array of time points
+                                       - 'points': numpy array of quest points at each time
+                                       - 'label': string label for the scenario
+                                       - 'completion_time': float completion time in minutes
+
+        Side Effects:
+            - Sets window title to "LoL MID LANE Quest Completion Calculator"
+            - Sets window geometry to 1200x750 pixels
+            - Calls setup_ui() to construct all UI elements
+
+        Example:
+            >>> root = tk.Tk()
+            >>> app = MidLaneQuestCalculatorGUI(root)
+            >>> root.mainloop()
+        """
         self.root = root
         self.root.title("LoL MID LANE Quest Completion Calculator")
         self.root.geometry("1200x750")
@@ -688,6 +830,29 @@ class MidLaneQuestCalculatorGUI:
         entry.focus()
 
         def on_ok():
+            """
+            Dialog callback for OK button - saves comparison scenario and closes dialog.
+
+            This nested function is a closure that captures variables from add_comparison():
+            - time_points: numpy array of time values for the curve
+            - quest_points: numpy array of point values for the curve
+            - completion_time: calculated quest completion time
+            - label_var: tkinter StringVar containing user's custom label
+            - default_label: auto-generated label as fallback
+
+            Behavior:
+                1. Retrieves and sanitizes the user's label (falls back to default if empty)
+                2. Appends scenario dict to self.comparison_scenarios list
+                3. Destroys the dialog window
+                4. Recalculates and redraws the graph with the new comparison line
+                5. Shows confirmation messagebox with total scenario count
+
+            Side Effects:
+                - Modifies self.comparison_scenarios (appends new dict)
+                - Closes dialog window
+                - Triggers graph redraw via self.calculate()
+                - Displays info messagebox
+            """
             label = label_var.get().strip()
             if not label:
                 label = default_label
@@ -705,6 +870,22 @@ class MidLaneQuestCalculatorGUI:
                 "Added", f"Scenario added (Total: {len(self.comparison_scenarios)})")
 
         def on_cancel():
+            """
+            Dialog callback for Cancel button - closes dialog without saving.
+
+            This nested function is a closure that captures the dialog window reference.
+            It provides a clean way to dismiss the label input dialog when the user
+            clicks Cancel or presses Escape.
+
+            Behavior:
+                - Simply destroys the dialog window
+                - Does NOT modify self.comparison_scenarios
+                - Does NOT trigger graph redraw
+                - Does NOT show any messagebox
+
+            Side Effects:
+                - Closes dialog window (no other side effects)
+            """
             dialog.destroy()
 
         button_frame = ttk.Frame(dialog)
@@ -729,6 +910,47 @@ class MidLaneQuestCalculatorGUI:
 # ============================================================================
 
 def main():
+    """
+    Main entry point for the Mid Lane Quest Calculator application.
+
+    This function initializes and launches the Tkinter GUI application. It creates
+    the root window, instantiates the calculator GUI, and starts the main event loop.
+
+    Execution Flow:
+        1. Creates the root Tkinter window (tk.Tk())
+        2. Instantiates MidLaneQuestCalculatorGUI with the root window
+           - This triggers __init__ which sets up all UI elements
+        3. Starts the Tkinter event loop (root.mainloop())
+           - Blocks until the user closes the window
+           - Handles all user interactions, button clicks, graph updates
+
+    Usage:
+        This function is called when the script is executed directly:
+        $ python quest_timer_calculator.py
+
+        Or programmatically:
+        >>> from quest_timer_calculator import main
+        >>> main()  # Opens the GUI application
+
+    Application Lifecycle:
+        - Program starts → main() is called
+        - Root window created → GUI initialized
+        - Event loop runs → user interacts with calculator
+        - Window closed → event loop exits → program terminates
+
+    Side Effects:
+        - Creates and displays a 1200x750 GUI window
+        - Blocks execution until window is closed
+        - May show messageboxes for validation errors or confirmations
+
+    Returns:
+        None (implicitly when window is closed)
+
+    Notes:
+        - This is a blocking call - the function won't return until the GUI is closed
+        - The application handles all exceptions internally with messageboxes
+        - No command-line arguments are processed
+    """
     root = tk.Tk()
     app = MidLaneQuestCalculatorGUI(root)
     root.mainloop()
